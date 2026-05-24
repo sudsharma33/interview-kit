@@ -1,0 +1,38 @@
+Job Title: Backend Software Engineer (2-4 years)
+Location: Bengaluru, India (Hybrid)
+Team: Payments Platform
+
+About the Role
+We are looking for a Backend Software Engineer to join our Payments Platform team. You will design, build, and operate the services that move money for millions of users every day. The role requires solid engineering fundamentals, a bias for clean and testable code, and comfort working in a high-availability environment.
+
+Responsibilities
+- Design and build scalable backend services in Python (FastAPI or Django) and/or Go.
+- Own features end-to-end: design doc, implementation, tests, deployment, monitoring.
+- Work with PostgreSQL and Redis; write performant queries and manage schema migrations.
+- Build and consume REST and gRPC APIs across internal services.
+- Contribute to event-driven workflows using Kafka.
+- Participate in on-call rotation; debug production incidents and write postmortems.
+- Collaborate with product managers, designers, and frontend engineers in an agile setup.
+- Mentor interns and junior engineers; review pull requests with care.
+
+Must-have Qualifications
+- 2-4 years of professional backend development experience.
+- Strong proficiency in Python (or Go) and object-oriented design.
+- Solid grasp of relational databases (PostgreSQL preferred) and SQL.
+- Hands-on experience designing and shipping production REST APIs.
+- Experience writing unit and integration tests; familiarity with CI/CD.
+- Working knowledge of Linux, Git, and Docker.
+- Clear written and verbal communication.
+
+Nice-to-have
+- Experience with Kafka or other event streaming platforms.
+- Exposure to AWS (ECS, RDS, SQS, Lambda) or GCP.
+- Familiarity with observability tools (Datadog, Grafana, Prometheus).
+- Background in payments, fintech, or any regulated domain.
+- Open-source contributions.
+
+What We Offer
+- Competitive salary and equity.
+- Health and wellness benefits for you and your family.
+- A flat, engineering-led culture with strong code review practices.
+- Budget for conferences, books, and online courses.

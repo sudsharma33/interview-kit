@@ -68,6 +68,8 @@ You can also paste the API key directly in the sidebar instead of using `.env`.
 1. Paste or upload a **Job Description** on the left.
 2. Paste or upload a **Resume** on the right.
 3. Click **Generate Interview Kit**.
+
+> **Quick demo:** the `samples/` folder contains a ready-to-use JD (Backend Engineer role) and a sample resume designed to surface both matched skills and real gaps. See `samples/README.md`.
 4. The app validates the inputs, then produces the full kit.
 5. During the interview, click into the **Score** column of the scorecard and enter 1–5 for each criterion. The weighted total updates live.
 6. Click **Download Scorecard (CSV)** or **Download Full Kit (JSON)** to save results.
@@ -110,7 +112,7 @@ You can also paste the API key directly in the sidebar instead of using `.env`.
 - **ATS integration** — push the JSON kit into Greenhouse / Lever / Workday.
 - **Question bank persistence** — save commonly-used questions across kits.
 - **Authentication + storage** so a team can collaborate on the same role.
-- **Sample-data library** — a built-in set of JD + resume pairs for quick demos and training.
+- **Expanded sample library** — more JD + resume pairs covering different roles (Data, PM, Designer) beyond the current Backend Engineer sample.
 
 ---
 
@@ -122,7 +124,11 @@ interview-kit/
 ├── requirements.txt      # Python dependencies
 ├── .env.example          # Template for API key config
 ├── .gitignore
-└── README.md
+├── README.md
+└── samples/
+    ├── sample_jd.txt
+    ├── sample_resume.txt
+    └── README.md
 ```
 
 ---

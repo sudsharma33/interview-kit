@@ -1,0 +1,46 @@
+Riya Menon
+Bengaluru, India  |  riya.menon@example.com  |  +91 98xxxxxx12  |  github.com/riyamenon
+
+Summary
+Backend-leaning software engineer with 3 years of experience building Python services for consumer products. Comfortable owning features end-to-end, from API design to production rollout. Looking for a role with deeper exposure to distributed systems and high-availability infrastructure.
+
+Experience
+
+Software Engineer — Brightcart Technologies, Bengaluru
+August 2022 – Present
+- Built and maintained 6+ Django REST services powering the seller dashboard, handling ~2M daily requests at p99 < 250 ms.
+- Led migration of the order-status service from a monolith to a standalone FastAPI microservice; reduced deploy time from 25 minutes to 4 minutes.
+- Designed and implemented a PostgreSQL schema for a new returns workflow; wrote Alembic migrations and rolled out with zero downtime.
+- Authored the team's pull request review checklist and ran weekly code review office hours for new joiners.
+- Set up GitHub Actions CI with linting, type checks (mypy), and pytest; coverage rose from 41% to 78% on owned services.
+- Wrote unit and integration tests as standard practice; introduced contract tests between two services using Pact.
+
+Software Engineer Intern — Brightcart Technologies, Bengaluru
+January 2022 – June 2022
+- Built an internal Slack bot in Python that surfaced on-call alerts; adopted by 4 teams.
+- Wrote a Postgres query optimization that cut p95 latency on the product-search endpoint from 1.2 s to 380 ms.
+
+Projects
+
+quickstub (open source)
+- A small CLI in Python that scaffolds FastAPI projects with sensible defaults (pre-commit, ruff, pytest, Dockerfile).
+- 140+ GitHub stars; 7 external contributors.
+
+Pothole Tracker (college capstone)
+- Android app that lets citizens report potholes; Django backend, PostGIS for geo-queries.
+- Won 2nd place at the state-level civic tech hackathon, 2021.
+
+Skills
+Languages: Python (strong), JavaScript (working), SQL (strong), Bash
+Frameworks: Django, FastAPI, Flask
+Datastores: PostgreSQL, SQLite, Redis (basic)
+Tools: Git, Docker, GitHub Actions, Linux, Postman, pytest, mypy, ruff
+Cloud: AWS (EC2, S3, RDS — basic familiarity)
+
+Education
+B.E. Computer Science — RV College of Engineering, Bengaluru
+2018 – 2022  |  CGPA: 8.6 / 10
+
+Activities
+- Volunteer mentor at PyLadies Bangalore, 2023–present.
+- Speaker, "Refactoring a Django monolith one endpoint at a time" — BangPypers meetup, March 2024.
