@@ -42,6 +42,37 @@ st.markdown(
       .qtext { font-weight: 500; font-size: 1rem; margin-bottom: 8px; line-height: 1.45; }
       .qmeta { font-size: 0.88rem; color: #aaa; margin-top: 4px; line-height: 1.45; }
       .qlabel { color: #888; font-weight: 500; }
+      .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+      .pill {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 500;
+        line-height: 1.2;
+        border: 1px solid transparent;
+      }
+      .pill-match { background: rgba(46,160,67,0.12); color: #2ea043; border-color: rgba(46,160,67,0.3); }
+      .pill-gap   { background: rgba(219,154,4,0.12); color: #dba904; border-color: rgba(219,154,4,0.3); }
+      .pill-empty { background: rgba(127,127,127,0.08); color: #888; border-color: rgba(127,127,127,0.2); }
+      .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        border: 1px dashed rgba(127,127,127,0.3);
+        border-radius: 12px;
+        margin: 24px 0;
+        color: #888;
+      }
+      .empty-state h3 { color: #aaa; margin: 0 0 8px 0; font-weight: 500; }
+      .empty-state p { margin: 0; font-size: 0.95rem; }
+      .summary-card {
+        padding: 16px 18px;
+        border: 1px solid rgba(127,127,127,0.18);
+        border-radius: 8px;
+        background: rgba(127,127,127,0.04);
+        height: 100%;
+      }
+      .summary-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 6px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -162,6 +193,16 @@ def questions_df(rows, cols):
     if not rows:
         return pd.DataFrame(columns=cols)
     return pd.DataFrame(rows)[cols]
+
+
+def render_pills(items, kind: str):
+    """Render a list of strings as colored pills. kind: 'match' | 'gap'."""
+    if not items:
+        st.markdown('<div class="pill-row"><span class="pill pill-empty">None identified</span></div>', unsafe_allow_html=True)
+        return
+    cls = f"pill pill-{kind}"
+    html = '<div class="pill-row">' + "".join(f'<span class="{cls}">{s}</span>' for s in items) + '</div>'
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def render_question_cards(rows, secondary_label: str, secondary_key: str):
@@ -325,79 +366,116 @@ if "kit" in st.session_state:
         del st.session_state.kit
         st.rerun()
 
-    st.markdown("#### Summary")
-    a, b = st.columns(2)
-    a.markdown(f"**Role**  \n{kit.get('jd_summary','')}")
-    b.markdown(f"**Candidate**  \n{kit.get('candidate_summary','')}")
+    tab_summary, tab_questions, tab_scorecard = st.tabs(["Summary", "Questions", "Scorecard"])
 
-    st.markdown("#### Skill Match vs Gap")
-    m, g = st.columns(2)
-    with m:
-        st.markdown("**Matched**")
-        for s in kit.get("matched_skills", []) or ["—"]:
-            st.markdown(f"- {s}")
-    with g:
-        st.markdown("**Gaps**")
-        for s in kit.get("gap_skills", []) or ["—"]:
-            st.markdown(f"- {s}")
+    # ---- Summary tab ----
+    with tab_summary:
+        a, b = st.columns(2)
+        with a:
+            st.markdown(
+                f"""<div class="summary-card">
+                  <div class="summary-label">Role</div>
+                  <div>{kit.get('jd_summary','')}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+        with b:
+            st.markdown(
+                f"""<div class="summary-card">
+                  <div class="summary-label">Candidate</div>
+                  <div>{kit.get('candidate_summary','')}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
 
-    st.markdown("#### Technical Questions")
-    render_question_cards(kit.get("technical_questions", []), "Why asked", "why_asked")
+        st.markdown("")  # spacing
+        m, g = st.columns(2)
+        with m:
+            st.markdown('<div class="summary-label">Matched Skills</div>', unsafe_allow_html=True)
+            render_pills(kit.get("matched_skills", []), "match")
+        with g:
+            st.markdown('<div class="summary-label">Gap Skills</div>', unsafe_allow_html=True)
+            render_pills(kit.get("gap_skills", []), "gap")
 
-    st.markdown("#### Behavioral Questions")
-    render_question_cards(kit.get("behavioral_questions", []), "Why asked", "why_asked")
+    # ---- Questions tab ----
+    with tab_questions:
+        sub_tech, sub_beh, sub_gap = st.tabs([
+            f"Technical ({len(kit.get('technical_questions', []))})",
+            f"Behavioral ({len(kit.get('behavioral_questions', []))})",
+            f"Gap Probes ({len(kit.get('gap_probe_questions', []))})",
+        ])
+        with sub_tech:
+            render_question_cards(kit.get("technical_questions", []), "Why asked", "why_asked")
+        with sub_beh:
+            render_question_cards(kit.get("behavioral_questions", []), "Why asked", "why_asked")
+        with sub_gap:
+            render_question_cards(kit.get("gap_probe_questions", []), "Targets gap", "targets_gap")
 
-    st.markdown("#### Gap-Probing Questions")
-    render_question_cards(kit.get("gap_probe_questions", []), "Targets gap", "targets_gap")
+    # ---- Scorecard tab ----
+    with tab_scorecard:
+        st.caption("Click any cell in the Score column and type 1–5. The weighted total updates live.")
+        sc_rows = kit.get("scorecard", [])
+        sc_df = pd.DataFrame(sc_rows) if sc_rows else pd.DataFrame()
+        if not sc_df.empty:
+            sc_df["Score"] = None
+            sc_df["Notes"] = ""
+            edited = st.data_editor(
+                sc_df,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed",
+                column_config={
+                    "criterion": st.column_config.TextColumn("Criterion", disabled=True),
+                    "weight": st.column_config.NumberColumn("Weight", min_value=1, max_value=5, disabled=True),
+                    "what_good_looks_like": st.column_config.TextColumn("What good looks like", disabled=True, width="large"),
+                    "Score": st.column_config.NumberColumn("Score", min_value=1, max_value=5, step=1, help="1–5"),
+                    "Notes": st.column_config.TextColumn("Notes", width="medium"),
+                },
+            )
+            scores = edited["Score"].fillna(0)
+            weighted = (edited["weight"] * scores).sum()
+            scored_mask = edited["Score"].notna()
+            max_score = (edited.loc[scored_mask, "weight"] * 5).sum()
+            pct = (weighted / max_score * 100) if max_score else 0
+            scored_count = int(scored_mask.sum())
+            total_count = len(edited)
+            completion = scored_count / total_count if total_count else 0
 
-    st.markdown("#### Interviewer Scorecard")
-    st.caption("Click any cell in the Score column and type 1–5. The weighted total updates live.")
-    sc_rows = kit.get("scorecard", [])
-    sc_df = pd.DataFrame(sc_rows) if sc_rows else pd.DataFrame()
-    if not sc_df.empty:
-        sc_df["Score"] = None
-        sc_df["Notes"] = ""
-        edited = st.data_editor(
-            sc_df,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="fixed",
-            column_config={
-                "criterion": st.column_config.TextColumn("Criterion", disabled=True),
-                "weight": st.column_config.NumberColumn("Weight", min_value=1, max_value=5, disabled=True),
-                "what_good_looks_like": st.column_config.TextColumn("What good looks like", disabled=True, width="large"),
-                "Score": st.column_config.NumberColumn("Score", min_value=1, max_value=5, step=1, help="1–5"),
-                "Notes": st.column_config.TextColumn("Notes", width="medium"),
-            },
-        )
-        scores = edited["Score"].fillna(0)
-        weighted = (edited["weight"] * scores).sum()
-        scored_mask = edited["Score"].notna()
-        max_score = (edited.loc[scored_mask, "weight"] * 5).sum()
-        pct = (weighted / max_score * 100) if max_score else 0
-        scored_count = int(scored_mask.sum())
-        total_count = len(edited)
+            st.progress(completion, text=f"Scoring progress: {scored_count} of {total_count} criteria")
 
-        c1, c2 = st.columns(2)
-        c1.metric(
-            "Weighted Score",
-            f"{weighted:.0f} / {max_score:.0f}" if max_score else "—",
-            f"{pct:.1f}%" if max_score else "Enter scores to see total",
-        )
-        c2.metric("Criteria Scored", f"{scored_count} / {total_count}")
+            c1, c2 = st.columns(2)
+            c1.metric(
+                "Weighted Score",
+                f"{weighted:.0f} / {max_score:.0f}" if max_score else "—",
+                f"{pct:.1f}%" if max_score else "Enter scores to see total",
+            )
+            c2.metric("Criteria Scored", f"{scored_count} / {total_count}")
 
-        d1, d2 = st.columns(2)
-        d1.download_button(
-            "Download Scorecard (CSV)",
-            edited.to_csv(index=False).encode("utf-8"),
-            file_name="interview_scorecard.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-        d2.download_button(
-            "Download Full Kit (JSON)",
-            json.dumps(kit, indent=2).encode("utf-8"),
-            file_name="interview_kit.json",
-            mime="application/json",
-            use_container_width=True,
-        )
+            d1, d2 = st.columns(2)
+            d1.download_button(
+                "Download Scorecard (CSV)",
+                edited.to_csv(index=False).encode("utf-8"),
+                file_name="interview_scorecard.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+            d2.download_button(
+                "Download Full Kit (JSON)",
+                json.dumps(kit, indent=2).encode("utf-8"),
+                file_name="interview_kit.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+# ---------- Empty state (only when nothing is in progress) ----------
+elif "validation" not in st.session_state:
+    st.markdown(
+        """
+        <div class="empty-state">
+          <h3>No interview kit yet</h3>
+          <p>Upload or paste a Job Description and a Resume above, then click <b>Generate Interview Kit</b>.</p>
+          <p style="margin-top:10px; font-size:0.85rem;">Tip: try the files in the <code>samples/</code> folder for a quick demo.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
