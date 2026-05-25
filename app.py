@@ -25,6 +25,23 @@ st.markdown(
       div[data-testid="stMetric"] { background: rgba(127,127,127,0.06); padding: 12px 16px; border-radius: 8px; }
       .muted { color: #888; font-size: 0.9rem; }
       .section-divider { border-top: 1px solid rgba(127,127,127,0.2); margin: 1.5rem 0; }
+      .qcard {
+        display: flex; gap: 14px;
+        padding: 14px 16px; margin: 8px 0;
+        border: 1px solid rgba(127,127,127,0.18);
+        border-radius: 8px;
+        background: rgba(127,127,127,0.04);
+      }
+      .qnum {
+        flex-shrink: 0;
+        font-weight: 600; font-size: 0.85rem;
+        color: #888;
+        padding-top: 2px; min-width: 28px;
+      }
+      .qbody { flex: 1; }
+      .qtext { font-weight: 500; font-size: 1rem; margin-bottom: 8px; line-height: 1.45; }
+      .qmeta { font-size: 0.88rem; color: #aaa; margin-top: 4px; line-height: 1.45; }
+      .qlabel { color: #888; font-weight: 500; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -147,6 +164,30 @@ def questions_df(rows, cols):
     return pd.DataFrame(rows)[cols]
 
 
+def render_question_cards(rows, secondary_label: str, secondary_key: str):
+    """Render a list of question dicts as readable numbered cards instead of a table."""
+    if not rows:
+        st.markdown("<div class='muted'>No questions generated.</div>", unsafe_allow_html=True)
+        return
+    for i, q in enumerate(rows, 1):
+        question = q.get("question", "")
+        secondary = q.get(secondary_key, "")
+        signal = q.get("expected_signal", "")
+        st.markdown(
+            f"""
+            <div class="qcard">
+              <div class="qnum">Q{i}</div>
+              <div class="qbody">
+                <div class="qtext">{question}</div>
+                <div class="qmeta"><span class="qlabel">{secondary_label}:</span> {secondary}</div>
+                <div class="qmeta"><span class="qlabel">Expected signal:</span> {signal}</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 # ---------- Input panel ----------
 st.session_state.setdefault("jd_text", "")
 st.session_state.setdefault("cv_text", "")
@@ -154,14 +195,21 @@ st.session_state.setdefault("jd_file_name", None)
 st.session_state.setdefault("cv_file_name", None)
 
 
+def drop_validation():
+    """Any change to inputs makes the previous validation result stale."""
+    st.session_state.pop("validation", None)
+
+
 def clear_jd():
     st.session_state.jd_text = ""
     st.session_state.jd_file_name = None
+    drop_validation()
 
 
 def clear_cv():
     st.session_state.cv_text = ""
     st.session_state.cv_file_name = None
+    drop_validation()
 
 
 def input_column(label: str, state_key: str, file_key: str, name_key: str, clear_fn):
@@ -176,10 +224,12 @@ def input_column(label: str, state_key: str, file_key: str, name_key: str, clear
     if uploaded is not None and uploaded.name != st.session_state[name_key]:
         st.session_state[state_key] = extract_text(uploaded)
         st.session_state[name_key] = uploaded.name
+        drop_validation()
     # If the file was removed via the uploader's "x", clear the textarea too.
     elif uploaded is None and st.session_state[name_key] is not None:
         st.session_state[state_key] = ""
         st.session_state[name_key] = None
+        drop_validation()
 
     cols = st.columns([1, 5])
     cols[0].button("Clear", key=f"clear_{state_key}", on_click=clear_fn, use_container_width=True)
@@ -192,6 +242,7 @@ def input_column(label: str, state_key: str, file_key: str, name_key: str, clear
         key=state_key,
         label_visibility="collapsed",
         placeholder="Paste text here, or upload a file above…",
+        on_change=drop_validation,
     )
 
 
@@ -291,22 +342,13 @@ if "kit" in st.session_state:
             st.markdown(f"- {s}")
 
     st.markdown("#### Technical Questions")
-    st.dataframe(
-        questions_df(kit.get("technical_questions", []), ["question", "why_asked", "expected_signal"]),
-        use_container_width=True, hide_index=True,
-    )
+    render_question_cards(kit.get("technical_questions", []), "Why asked", "why_asked")
 
     st.markdown("#### Behavioral Questions")
-    st.dataframe(
-        questions_df(kit.get("behavioral_questions", []), ["question", "why_asked", "expected_signal"]),
-        use_container_width=True, hide_index=True,
-    )
+    render_question_cards(kit.get("behavioral_questions", []), "Why asked", "why_asked")
 
     st.markdown("#### Gap-Probing Questions")
-    st.dataframe(
-        questions_df(kit.get("gap_probe_questions", []), ["question", "targets_gap", "expected_signal"]),
-        use_container_width=True, hide_index=True,
-    )
+    render_question_cards(kit.get("gap_probe_questions", []), "Targets gap", "targets_gap")
 
     st.markdown("#### Interviewer Scorecard")
     st.caption("Click any cell in the Score column and type 1–5. The weighted total updates live.")
