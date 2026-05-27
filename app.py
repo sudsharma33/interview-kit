@@ -451,6 +451,20 @@ if "kit" in st.session_state:
             )
             c2.metric("Criteria Scored", f"{scored_count} / {total_count}")
 
+            # Build a complete export that merges the interviewer's scores/notes
+            # back into the kit and includes computed totals.
+            export_kit = {
+                **kit,
+                "scorecard": edited.to_dict(orient="records"),
+                "scoring_summary": {
+                    "weighted_score": float(weighted),
+                    "max_possible": float(max_score) if max_score else 0.0,
+                    "percentage": float(pct),
+                    "criteria_scored": scored_count,
+                    "criteria_total": total_count,
+                },
+            }
+
             d1, d2 = st.columns(2)
             d1.download_button(
                 "Download Scorecard (CSV)",
@@ -461,7 +475,7 @@ if "kit" in st.session_state:
             )
             d2.download_button(
                 "Download Full Kit (JSON)",
-                json.dumps(kit, indent=2).encode("utf-8"),
+                json.dumps(export_kit, indent=2).encode("utf-8"),
                 file_name="interview_kit.json",
                 mime="application/json",
                 use_container_width=True,
