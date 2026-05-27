@@ -79,13 +79,24 @@ st.markdown(
 )
 
 # ---------- Sidebar ----------
+# Server-side secret. NEVER passed to the password field's `value=` argument,
+# because doing so would expose it to the visitor's browser (the masking is
+# cosmetic — the underlying value is readable via dev tools or session state).
+_server_key = os.getenv("GOOGLE_API_KEY", "")
+
 st.sidebar.header("Settings")
-api_key = st.sidebar.text_input(
+_user_key = st.sidebar.text_input(
     "Google AI Studio API Key",
-    value=os.getenv("GOOGLE_API_KEY", ""),
     type="password",
-    help="Get a free key at https://aistudio.google.com/app/apikey",
+    placeholder="Paste your key, or leave blank to use the server default" if _server_key else "Paste your AI Studio key here",
+    help="Get a free key at https://aistudio.google.com/app/apikey. The server-configured key (if any) stays on the server and is never sent to the browser.",
 )
+# Visitor-supplied key takes precedence; otherwise fall back to the server secret.
+api_key = _user_key or _server_key
+
+if _server_key and not _user_key:
+    st.sidebar.caption("✓ Using server-configured key")
+
 model_name = st.sidebar.selectbox(
     "Model",
     ["gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"],
