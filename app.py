@@ -339,20 +339,22 @@ def input_column(label: str, state_key: str, file_key: str, name_key: str, clear
     )
 
 
-st.title("Interview Kit Generator")
-st.markdown(
-    "<p class='muted'>Generate tailored interview questions and a scorecard from a job description and a candidate resume.</p>",
-    unsafe_allow_html=True,
-)
-
 # Gate the entire app behind sign-in. Until the user is authenticated,
-# render_login_gate() shows the centred sign-in / sign-up card and st.stop()
-# halts everything below.
+# render_login_gate() shows the centred sign-in / sign-up card (which has
+# its OWN title) and st.stop() halts everything below.
+# The main title/description only render for authenticated users — that's
+# why this gate comes BEFORE st.title().
 if not auth.require_login():
     st.stop()
 
 auth.render_logout_button()
 _render_history_sidebar()
+
+st.title("Interview Kit Generator")
+st.markdown(
+    "<p class='muted'>Generate tailored interview questions and a scorecard from a job description and a candidate resume.</p>",
+    unsafe_allow_html=True,
+)
 
 col1, col2 = st.columns(2)
 with col1:
