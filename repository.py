@@ -149,6 +149,85 @@ def save_scorecard(
     return sc_id
 
 
+def upsert_scorecard_progress(
+    *,
+    kit_id: str,
+    user_id: str,
+    scores_json: list[dict],
+    weighted_total: float,
+    max_possible: float,
+    percentage: float,
+) -> str:
+    """
+    Save or update the user's in-progress scorecard for a given kit.
+
+    One scorecard row per (kit_id, user_id) — overwriting earlier progress.
+    This is the right shape for "auto-save while the interviewer scores":
+    we don't want a new row on every keystroke, but we do want the latest
+    state to survive page reloads or app restarts.
+    """
+    with get_session() as s:
+        existing = s.scalar(
+            select(Scorecard).where(
+                Scorecard.kit_id == kit_id, Scorecard.filled_by == user_id
+            )
+        )
+        if existing:
+            existing.scores_json = {"rows": scores_json}
+            existing.weighted_total = weighted_total
+            existing.max_possible = max_possible
+            existing.percentage = percentage
+            # only mark completed once every row has a non-null score
+            if scores_json and all(r.get("Score") is not None for r in scores_json):
+                existing.completed_at = datetime.now(timezone.utc)
+            sc_id = existing.id
+            action = "scorecard.updated"
+        else:
+            sc = Scorecard(
+                kit_id=kit_id,
+                filled_by=user_id,
+                scores_json={"rows": scores_json},
+                weighted_total=weighted_total,
+                max_possible=max_possible,
+                percentage=percentage,
+            )
+            s.add(sc)
+            s.flush()
+            sc_id = sc.id
+            action = "scorecard.started"
+        s.add(AuditLog(user_id=user_id, action=action, resource_id=sc_id))
+    return sc_id
+
+
+def get_latest_scorecard(kit_id: str, user_id: str) -> dict | None:
+    """
+    Return the most recent scorecard the user has for this kit, or None.
+
+    Used by the UI to pre-fill the Score and Notes columns when a kit is
+    re-opened from history, so the interviewer's previous progress is
+    restored exactly as they left it.
+    """
+    with get_session() as s:
+        sc = s.scalar(
+            select(Scorecard)
+            .where(Scorecard.kit_id == kit_id, Scorecard.filled_by == user_id)
+            .order_by(desc(Scorecard.created_at))
+            .limit(1)
+        )
+        if not sc:
+            return None
+        return {
+            "id": sc.id,
+            "kit_id": sc.kit_id,
+            "filled_by": sc.filled_by,
+            "rows": sc.scores_json.get("rows", []) if sc.scores_json else [],
+            "weighted_total": float(sc.weighted_total) if sc.weighted_total is not None else None,
+            "max_possible": float(sc.max_possible) if sc.max_possible is not None else None,
+            "percentage": float(sc.percentage) if sc.percentage is not None else None,
+            "completed_at": sc.completed_at,
+        }
+
+
 # ---------------------------------------------------------------------------
 # Audit log
 # ---------------------------------------------------------------------------

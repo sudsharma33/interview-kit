@@ -127,6 +127,15 @@ def _render_history_sidebar():
             if loaded:
                 st.session_state.kit = loaded["kit_json"]
                 st.session_state.kit_id = loaded["id"]
+                # Pull any saved scorecard progress back into session_state
+                # so the interviewer resumes exactly where they left off.
+                sc = repo.get_latest_scorecard(loaded["id"], st.session_state.user_id)
+                if sc and sc.get("rows"):
+                    st.session_state.loaded_scorecard_rows = sc["rows"]
+                else:
+                    st.session_state.pop("loaded_scorecard_rows", None)
+                # invalidate any stale auto-save snapshot from a previous kit
+                st.session_state.pop("scorecard_last_saved_hash", None)
                 st.rerun()
 
 
@@ -472,12 +481,22 @@ if "kit" in st.session_state:
 
     # ---- Scorecard tab ----
     with tab_scorecard:
-        st.caption("Click any cell in the Score column and type 1–5. The weighted total updates live.")
+        st.caption("Click any cell in the Score column and type 1–5. The weighted total updates live. Scores are auto-saved to the database.")
         sc_rows = kit.get("scorecard", [])
         sc_df = pd.DataFrame(sc_rows) if sc_rows else pd.DataFrame()
         if not sc_df.empty:
             sc_df["Score"] = None
             sc_df["Notes"] = ""
+            # Restore previously saved scorecard progress if any.
+            saved_rows = st.session_state.get("loaded_scorecard_rows") or []
+            if saved_rows:
+                # Index saved rows by criterion so we tolerate row reordering.
+                saved_by_criterion = {r.get("criterion"): r for r in saved_rows}
+                for i, row in sc_df.iterrows():
+                    prev = saved_by_criterion.get(row["criterion"])
+                    if prev:
+                        sc_df.at[i, "Score"] = prev.get("Score")
+                        sc_df.at[i, "Notes"] = prev.get("Notes", "") or ""
             edited = st.data_editor(
                 sc_df,
                 use_container_width=True,
@@ -509,6 +528,33 @@ if "kit" in st.session_state:
                 f"{pct:.1f}%" if max_score else "Enter scores to see total",
             )
             c2.metric("Criteria Scored", f"{scored_count} / {total_count}")
+
+            # ---- Auto-save scorecard progress to Postgres ----
+            # On every Streamlit rerun we hash the current scorecard state and
+            # only issue a DB write if it changed since the last save. That
+            # keeps the keystroke-level rerun cycle cheap.
+            if "kit_id" in st.session_state and "user_id" in st.session_state:
+                scorecard_rows = edited.to_dict(orient="records")
+                # tuple of (criterion, score, notes) is a stable, JSON-safe signature
+                sig = tuple(
+                    (r.get("criterion"), r.get("Score"), r.get("Notes", ""))
+                    for r in scorecard_rows
+                )
+                if st.session_state.get("scorecard_last_saved_hash") != sig:
+                    try:
+                        repo.upsert_scorecard_progress(
+                            kit_id=st.session_state.kit_id,
+                            user_id=st.session_state.user_id,
+                            scores_json=scorecard_rows,
+                            weighted_total=float(weighted),
+                            max_possible=float(max_score) if max_score else 0.0,
+                            percentage=float(pct),
+                        )
+                        st.session_state.scorecard_last_saved_hash = sig
+                        if scored_count > 0:
+                            st.caption("✓ Auto-saved")
+                    except Exception as save_err:
+                        st.caption(f"Auto-save failed: {save_err}")
 
             # Build a complete export that merges the interviewer's scores/notes
             # back into the kit and includes computed totals.
