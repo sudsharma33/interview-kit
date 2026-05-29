@@ -105,6 +105,22 @@ model_name = st.sidebar.selectbox(
 )
 
 
+def _compose_role_label(kit: dict) -> str:
+    """
+    Build a compact label for a kit in the form:
+        'Candidate Name — Company / Role'
+    Used as the history sidebar label and as the row title in archives.
+    """
+    candidate = (kit.get("candidate_name") or "").strip()
+    company = (kit.get("company_name") or "").strip()
+    role = (kit.get("role_title") or "").strip()
+
+    right_side = " / ".join(p for p in (company, role) if p and p.lower() not in {"unknown", "unknown company", "unknown role"})
+    if candidate and candidate.lower() not in {"unknown candidate", "unknown"}:
+        return f"{candidate} — {right_side}" if right_side else candidate
+    return right_side or "Untitled kit"
+
+
 def _render_history_sidebar():
     """Show the current user's recent kits, loaded from Postgres."""
     if "user_id" not in st.session_state:
@@ -120,7 +136,8 @@ def _render_history_sidebar():
         st.sidebar.caption("No kits yet — generate one to populate.")
         return
     for k in kits:
-        label = (k.get("role_title") or "Untitled kit")[:50]
+        # Prefer the composed label (saved on newer kits); fall back gracefully.
+        label = (k.get("role_title") or k.get("candidate_name") or "Untitled kit")[:60]
         when = k["created_at"].strftime("%b %d, %H:%M")
         if st.sidebar.button(f"{label}\n{when}", key=f"hist_{k['id']}", use_container_width=True):
             loaded = repo.load_kit(k["id"])
@@ -147,6 +164,9 @@ Given the JOB DESCRIPTION and CANDIDATE RESUME below, produce a structured inter
 
 Return ONLY valid JSON (no markdown fences) with this exact schema:
 {{
+  "candidate_name":   "the candidate's full name, or 'Unknown candidate' if not present",
+  "company_name":     "the hiring company name, or 'Unknown company' if not present",
+  "role_title":       "the job title (e.g. 'Senior Backend Engineer'), or 'Unknown role' if not present",
   "candidate_summary": "2-3 sentence overview of the candidate",
   "jd_summary": "2-3 sentence overview of the role",
   "matched_skills":   ["skills present in BOTH resume and JD"],
@@ -370,6 +390,8 @@ def run_generation():
                     jd_text=st.session_state.jd_text,
                     resume_text=st.session_state.cv_text,
                     kit_json=kit,
+                    role_title=_compose_role_label(kit),
+                    candidate_name=kit.get("candidate_name") or None,
                 )
                 st.session_state.kit_id = kit_id
             except Exception as db_err:
