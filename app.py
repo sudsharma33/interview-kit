@@ -8,6 +8,7 @@ from google import genai
 from google.genai import types
 
 from parsing import extract_text  # pure-logic helpers, unit-tested in isolation
+import repository as repo  # database persistence layer
 
 load_dotenv()
 
@@ -102,6 +103,32 @@ model_name = st.sidebar.selectbox(
     index=0,
     help="Lite is the safest free-tier choice.",
 )
+
+
+def _render_history_sidebar():
+    """Show the current user's recent kits, loaded from Postgres."""
+    if "user_id" not in st.session_state:
+        return
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Recent Kits")
+    try:
+        kits = repo.list_kits_for_user(st.session_state.user_id, limit=8)
+    except Exception as e:
+        st.sidebar.caption(f"History unavailable ({type(e).__name__})")
+        return
+    if not kits:
+        st.sidebar.caption("No kits yet — generate one to populate.")
+        return
+    for k in kits:
+        label = (k.get("role_title") or "Untitled kit")[:50]
+        when = k["created_at"].strftime("%b %d, %H:%M")
+        if st.sidebar.button(f"{label}\n{when}", key=f"hist_{k['id']}", use_container_width=True):
+            loaded = repo.load_kit(k["id"])
+            if loaded:
+                st.session_state.kit = loaded["kit_json"]
+                st.session_state.kit_id = loaded["id"]
+                st.rerun()
+
 
 # `extract_text` lives in parsing.py for unit-testability and reuse.
 
@@ -288,6 +315,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Ensure a user exists so the history sidebar can populate even before the
+# first generation. Day 2 replaces this with real auth.
+try:
+    if "user_id" not in st.session_state:
+        u = repo.get_or_create_user("demo@interview-kit.local", "Demo User")
+        st.session_state.user_id = u["id"]
+except Exception:
+    pass  # DB unavailable; app still works in ephemeral mode
+
+_render_history_sidebar()
+
 col1, col2 = st.columns(2)
 with col1:
     input_column("Job Description", "jd_text", "jd_file", "jd_file_name", clear_jd)
@@ -299,10 +337,36 @@ st.markdown("<div class='section-divider'></div>", unsafe_allow_html=True)
 go = st.button("Generate Interview Kit", type="primary", use_container_width=True)
 
 
+def _current_user_id() -> str:
+    """
+    Until real auth lands (Day 2), every generation is attributed to a
+    single demo user so persistence is visible end-to-end.
+    """
+    if "user_id" not in st.session_state:
+        u = repo.get_or_create_user("demo@interview-kit.local", "Demo User")
+        st.session_state.user_id = u["id"]
+    return st.session_state.user_id
+
+
 def run_generation():
     with st.spinner("Analyzing and generating interview kit…"):
         try:
-            st.session_state.kit = generate_kit(st.session_state.jd_text, st.session_state.cv_text)
+            kit = generate_kit(st.session_state.jd_text, st.session_state.cv_text)
+            st.session_state.kit = kit
+            # Persist to Postgres so the kit survives reloads, deploys, and
+            # appears in the user's history sidebar.
+            try:
+                kit_id = repo.save_kit(
+                    user_id=_current_user_id(),
+                    jd_text=st.session_state.jd_text,
+                    resume_text=st.session_state.cv_text,
+                    kit_json=kit,
+                )
+                st.session_state.kit_id = kit_id
+            except Exception as db_err:
+                # Never block the user if the DB write fails — the kit is
+                # still in session_state. Log to the UI for visibility.
+                st.warning(f"Kit generated but not persisted to history: {db_err}")
             st.session_state.pop("validation", None)
         except Exception as e:
             st.error(f"Generation failed: {e}")
