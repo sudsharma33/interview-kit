@@ -122,7 +122,8 @@ def _render_microsoft_button() -> None:
         use_container_width=True,
         key="sso_signin_button",
     ):
-        st.login()  # redirects to Microsoft Entra ID
+        # Named provider must match the secrets.toml [auth.microsoft] section.
+        st.login("microsoft")
 
 
 def _render_password_signin_form() -> None:
