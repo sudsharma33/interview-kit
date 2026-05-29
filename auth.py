@@ -70,15 +70,27 @@ def _ensure_user_record_from_sso() -> None:
     Streamlit confirmed a Microsoft sign-in but we haven't materialised our
     own `users` row yet. Match (or create) the row by email and stash the
     user_id in session_state.
+
+    Microsoft personal accounts sometimes return the email under
+    `preferred_username` instead of `email`, so we fall back through several
+    claims before giving up.
     """
     if "user_id" in st.session_state:
         return
-    email = getattr(st.user, "email", None)
-    name = getattr(st.user, "name", None)
+    # Try multiple claim names — Microsoft varies these by account type.
+    email = (
+        getattr(st.user, "email", None)
+        or getattr(st.user, "preferred_username", None)
+        or getattr(st.user, "upn", None)
+    )
+    name = getattr(st.user, "name", None) or getattr(st.user, "given_name", None)
     if not email:
+        # Surface what claims we DID get, so the user/developer can debug.
+        available = {k: v for k, v in dict(st.user).items() if not k.startswith("_")} if hasattr(st.user, "__iter__") else {}
         st.error(
             "Microsoft sign-in didn't return an email address. "
-            "Sign out and try again with an account that has an email claim."
+            f"Available claims: {sorted(available.keys()) or 'unknown'}. "
+            "Sign out and try a different Microsoft account, or use email + password instead."
         )
         st.stop()
     user = repo.get_or_create_user(email, name)
