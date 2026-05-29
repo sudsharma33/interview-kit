@@ -609,7 +609,6 @@ elif "validation" not in st.session_state:
         <div class="empty-state">
           <h3>No interview kit yet</h3>
           <p>Upload or paste a Job Description and a Resume above, then click <b>Generate Interview Kit</b>.</p>
-          <p style="margin-top:10px; font-size:0.85rem;">Tip: try the files in the <code>samples/</code> folder for a quick demo.</p>
         </div>
         """,
         unsafe_allow_html=True,
