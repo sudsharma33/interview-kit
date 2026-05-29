@@ -16,6 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Iterable
 
+import bcrypt
 from sqlalchemy import select, desc
 
 from db import get_session
@@ -28,9 +29,8 @@ from models import AuditLog, Kit, Scorecard, User
 
 def get_or_create_user(email: str, display_name: str | None = None) -> dict:
     """
-    For Day 1, auth is "trust the email". Day 2 adds password verification.
-    Returns a dict (id, email, display_name) so callers don't need to know
-    about SQLAlchemy.
+    Passwordless helper kept only for the initial demo seed user. New users
+    flowing through the UI must use `register_user()` instead.
     """
     email = email.strip().lower()
     with get_session() as s:
@@ -42,6 +42,69 @@ def get_or_create_user(email: str, display_name: str | None = None) -> dict:
         s.flush()
         result = _user_to_dict(user)
     return result
+
+
+class UserAlreadyExists(Exception):
+    """Raised when sign-up is attempted with an email that's already taken."""
+
+
+class InvalidCredentials(Exception):
+    """Raised when sign-in fails due to wrong email or password."""
+
+
+def _hash_password(plain: str) -> str:
+    """bcrypt with a per-password salt. Cost factor 12 is the 2024 sweet spot."""
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+
+def _verify_password(plain: str, hashed: str) -> bool:
+    if not hashed:
+        return False
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
+
+
+def register_user(email: str, password: str, display_name: str | None = None) -> dict:
+    """
+    Create a new user with a bcrypt-hashed password.
+    Raises UserAlreadyExists if the email is taken.
+    """
+    email = email.strip().lower()
+    if not email or "@" not in email:
+        raise ValueError("Please enter a valid email address.")
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters.")
+    with get_session() as s:
+        if s.scalar(select(User).where(User.email == email)):
+            raise UserAlreadyExists(email)
+        user = User(
+            email=email,
+            display_name=(display_name or "").strip() or None,
+            password_hash=_hash_password(password),
+        )
+        s.add(user)
+        s.flush()
+        s.add(AuditLog(user_id=user.id, action="user.registered", resource_id=user.id))
+        result = _user_to_dict(user)
+    return result
+
+
+def authenticate_user(email: str, password: str) -> dict:
+    """
+    Verify an email + password combination. Returns the user dict on success;
+    raises InvalidCredentials on any failure. Deliberately gives the same
+    error message for "no such user" and "wrong password" to avoid leaking
+    which emails exist.
+    """
+    email = email.strip().lower()
+    with get_session() as s:
+        u = s.scalar(select(User).where(User.email == email))
+        if not u or not _verify_password(password, u.password_hash or ""):
+            raise InvalidCredentials("Email or password is incorrect.")
+        s.add(AuditLog(user_id=u.id, action="user.signed_in", resource_id=u.id))
+        return _user_to_dict(u)
 
 
 def get_user_by_id(user_id: str) -> dict | None:

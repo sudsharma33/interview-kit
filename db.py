@@ -36,15 +36,27 @@ def _build_url() -> str:
     return url
 
 
+def _connect_args(url: str) -> dict:
+    """
+    Require SSL when pointing at a hosted Postgres (Render, Supabase, etc.)
+    but not for the in-cluster docker-compose Postgres which doesn't have it
+    enabled. Detection is host-based: anything with a hostname containing
+    'render.com' or 'supabase' or 'amazonaws' gets sslmode=require.
+    """
+    needs_ssl = any(p in url for p in ("render.com", "supabase", "amazonaws", "neon.tech"))
+    return {"sslmode": "require"} if needs_ssl else {}
+
+
 # `pool_pre_ping=True` keeps long-lived connections alive across Render's
 # idle timeouts. `pool_size`/`max_overflow` are sized for a single Streamlit
 # process — bump these when the app is split into a real backend service.
+_url = _build_url()
 engine = create_engine(
-    _build_url(),
+    _url,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=5,
-    connect_args={"sslmode": "require"},
+    connect_args=_connect_args(_url),
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+import auth  # login / sign-up UI + session gating
 from parsing import extract_text  # pure-logic helpers, unit-tested in isolation
 import repository as repo  # database persistence layer
 
@@ -344,15 +345,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Ensure a user exists so the history sidebar can populate even before the
-# first generation. Day 2 replaces this with real auth.
-try:
-    if "user_id" not in st.session_state:
-        u = repo.get_or_create_user("demo@interview-kit.local", "Demo User")
-        st.session_state.user_id = u["id"]
-except Exception:
-    pass  # DB unavailable; app still works in ephemeral mode
+# Gate the entire app behind sign-in. Until the user is authenticated,
+# render_login_gate() shows the centred sign-in / sign-up card and st.stop()
+# halts everything below.
+if not auth.require_login():
+    st.stop()
 
+auth.render_logout_button()
 _render_history_sidebar()
 
 col1, col2 = st.columns(2)
@@ -366,17 +365,6 @@ st.markdown("<div class='section-divider'></div>", unsafe_allow_html=True)
 go = st.button("Generate Interview Kit", type="primary", use_container_width=True)
 
 
-def _current_user_id() -> str:
-    """
-    Until real auth lands (Day 2), every generation is attributed to a
-    single demo user so persistence is visible end-to-end.
-    """
-    if "user_id" not in st.session_state:
-        u = repo.get_or_create_user("demo@interview-kit.local", "Demo User")
-        st.session_state.user_id = u["id"]
-    return st.session_state.user_id
-
-
 def run_generation():
     with st.spinner("Analyzing and generating interview kit…"):
         try:
@@ -386,7 +374,7 @@ def run_generation():
             # appears in the user's history sidebar.
             try:
                 kit_id = repo.save_kit(
-                    user_id=_current_user_id(),
+                    user_id=st.session_state.user_id,
                     jd_text=st.session_state.jd_text,
                     resume_text=st.session_state.cv_text,
                     kit_json=kit,

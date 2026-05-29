@@ -1,0 +1,51 @@
+# Local development stack.
+#
+#   docker compose up        — starts Postgres + the Streamlit app
+#   docker compose up -d     — same, but detached (background)
+#   docker compose down      — stops both. Add `-v` to wipe the DB volume too.
+#   docker compose logs -f app  — tail the app logs
+#
+# When this stack runs, your live app is available at http://localhost:8501.
+# Postgres is at localhost:5432 from the host, or `db:5432` from inside any
+# container in the compose network.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: interview-kit-db
+    environment:
+      POSTGRES_USER: interview_kit
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: interview_kit
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "interview_kit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: interview-kit-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Override with your real key for live demos. Defaults work for local UI tests.
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-set-me-in-shell-or-dotenv}
+      # Points at the bundled Postgres service. The +psycopg scheme tells
+      # SQLAlchemy to use the modern psycopg v3 driver.
+      DATABASE_URL: postgresql+psycopg://interview_kit:localdev@db:5432/interview_kit
+    ports:
+      - "8501:8501"
+    # Mount the project read-only so local code changes can be picked up by
+    # restarting just the app container (`docker compose restart app`) without
+    # rebuilding. Comment this out in production.
+    volumes:
+      - ./:/app:ro
+
+volumes:
+  pgdata:

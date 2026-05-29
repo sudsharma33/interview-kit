@@ -44,11 +44,12 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    needs_ssl = any(p in db_url for p in ("render.com", "supabase", "amazonaws", "neon.tech"))
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        connect_args={"sslmode": "require"},
+        connect_args={"sslmode": "require"} if needs_ssl else {},
     )
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
