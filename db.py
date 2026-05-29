@@ -13,11 +13,12 @@ the missing env var becomes a clear, actionable error.
 """
 
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 # Eager-load .env so any importer of this module gets DATABASE_URL when
 # running locally with a .env file. In CI / containers, environment variables
@@ -82,7 +83,7 @@ def _get_session_factory() -> sessionmaker:
 
 
 @contextmanager
-def get_session() -> Session:
+def get_session() -> Iterator[Session]:
     """Yield a SQLAlchemy session that commits on success, rolls back on error."""
     session = _get_session_factory()()
     try:

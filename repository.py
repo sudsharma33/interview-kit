@@ -13,15 +13,13 @@ SQLAlchemy result rows that would leak ORM details into the UI layer.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Iterable
+from datetime import UTC, datetime
 
 import bcrypt
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 
 from db import get_session
 from models import AuditLog, Kit, Scorecard, User
-
 
 # ---------------------------------------------------------------------------
 # Users
@@ -203,7 +201,7 @@ def save_scorecard(
             weighted_total=weighted_total,
             max_possible=max_possible,
             percentage=percentage,
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(UTC),
         )
         s.add(sc)
         s.add(AuditLog(user_id=user_id, action="scorecard.completed", resource_id=sc.id))
@@ -242,7 +240,7 @@ def upsert_scorecard_progress(
             existing.percentage = percentage
             # only mark completed once every row has a non-null score
             if scores_json and all(r.get("Score") is not None for r in scores_json):
-                existing.completed_at = datetime.now(timezone.utc)
+                existing.completed_at = datetime.now(UTC)
             sc_id = existing.id
             action = "scorecard.updated"
         else:

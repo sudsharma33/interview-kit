@@ -8,8 +8,8 @@ from google import genai
 from google.genai import types
 
 import auth  # login / sign-up UI + session gating
-from parsing import extract_text  # pure-logic helpers, unit-tested in isolation
 import repository as repo  # database persistence layer
+from parsing import extract_text  # pure-logic helpers, unit-tested in isolation
 
 load_dotenv()
 
@@ -206,6 +206,8 @@ def generate_kit(jd: str, resume: str) -> dict:
             temperature=0.4,
         ),
     )
+    if not resp.text:
+        raise RuntimeError("Gemini returned an empty response.")
     return json.loads(resp.text)
 
 
@@ -238,6 +240,8 @@ def validate_inputs(jd: str, resume: str) -> dict:
             temperature=0.1,
         ),
     )
+    if not resp.text:
+        raise RuntimeError("Gemini returned an empty validation response.")
     return json.loads(resp.text)
 
 

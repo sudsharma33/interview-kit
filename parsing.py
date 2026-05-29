@@ -8,6 +8,7 @@ the production architecture described in PRODUCTION_ARCHITECTURE.md.
 """
 
 from io import BytesIO
+
 from docx import Document
 from pypdf import PdfReader
 

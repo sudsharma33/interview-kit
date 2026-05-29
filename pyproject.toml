@@ -1,0 +1,69 @@
+# Project metadata + tool configuration in one place (PEP 621 / PEP 518).
+# This is the modern Python convention — keeps every tool's settings co-located
+# instead of scattered across setup.cfg, .flake8, mypy.ini, etc.
+
+[project]
+name = "interview-kit"
+version = "1.0.0"
+description = "Interview Kit Generator — Streamlit app with PostgreSQL persistence and auth"
+requires-python = ">=3.11"
+
+# ---------------------------------------------------------------------------
+# ruff — the linter and formatter (replaces flake8 + pylint + isort)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+# A pragmatic set of checks — strict on correctness, lenient on style.
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear (real bug classes)
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long — soft warning; we already cap to 120 above
+    "B008",  # function calls in argument defaults — fine for FastAPI-style use
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]  # allow late imports in test files
+
+# ---------------------------------------------------------------------------
+# mypy — static type checker
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+# Start lenient. As the codebase matures, ratchet these settings up.
+ignore_missing_imports = true
+follow_imports = "silent"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = false
+exclude = ["alembic/versions/", "\\.venv/", "tests/"]
+
+# ---------------------------------------------------------------------------
+# bandit — security scanner
+# ---------------------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = ["tests", "alembic", ".venv", "venv"]
+# B101 = use of assert — fine outside production runtime
+# B608 = hardcoded SQL — false positives on SQLAlchemy patterns
+skips = ["B101", "B608"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra --strict-markers --tb=short"
+markers = [
+    "integration: requires a live Postgres database (set TEST_DATABASE_URL)",
+]

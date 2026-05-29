@@ -8,9 +8,6 @@ These tests intentionally avoid hitting the real LLM API. They cover:
   - JSON schema shape of expected LLM output
 """
 
-import json
-import io
-import os
 import sys
 from pathlib import Path
 
@@ -66,7 +63,7 @@ def test_extract_text_unknown_extension(extract_text):
 
 
 def test_extract_text_txt_unicode(extract_text):
-    f = FakeUpload("resume.txt", "Name: Riya Menon — Bengaluru".encode("utf-8"))
+    f = FakeUpload("resume.txt", "Name: Riya Menon — Bengaluru".encode())
     out = extract_text(f)
     assert "Riya Menon" in out
     assert "Bengaluru" in out

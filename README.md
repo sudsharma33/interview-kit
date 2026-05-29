@@ -1,5 +1,9 @@
 # Interview Kit Generator
 
+[![CI/CD Pipeline](https://github.com/sudsharma33/interview-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/sudsharma33/interview-kit/actions/workflows/ci.yml)
+[![Live App](https://img.shields.io/badge/live-interview--kit.streamlit.app-brightgreen)](https://interview-kit.streamlit.app)
+[![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/)
+
 A web app that takes a **Job Description** and a **Candidate Resume** and produces a focused, ready-to-use interview kit for the interviewer — including tailored questions, skill-gap probes, and an interactive scorecard.
 
 Built for the Fresher Hackathon — **Challenge #10: Interview Question and Scorecard Generator**.

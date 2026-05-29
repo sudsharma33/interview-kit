@@ -15,10 +15,9 @@ PRODUCTION_ARCHITECTURE.md Phase 4.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
-    JSON,
     DateTime,
     ForeignKey,
     Integer,
@@ -26,8 +25,8 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def _uuid() -> str:
@@ -35,7 +34,7 @@ def _uuid() -> str:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Base(DeclarativeBase):
@@ -51,7 +50,7 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
-    kits: Mapped[list["Kit"]] = relationship(back_populates="created_by_user", cascade="all, delete-orphan")
+    kits: Mapped[list[Kit]] = relationship(back_populates="created_by_user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email!r}>"
@@ -70,7 +69,7 @@ class Kit(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
 
     created_by_user: Mapped[User] = relationship(back_populates="kits")
-    scorecards: Mapped[list["Scorecard"]] = relationship(back_populates="kit", cascade="all, delete-orphan")
+    scorecards: Mapped[list[Scorecard]] = relationship(back_populates="kit", cascade="all, delete-orphan")
 
 
 class Scorecard(Base):

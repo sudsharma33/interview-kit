@@ -1,9 +1,13 @@
-name: CI
+name: CI/CD Pipeline
 
-# Runs on every push and pull request to main.
-# This is the "test pipeline" — a developer pushes code, GitHub spins up a
-# clean environment, installs dependencies, runs the test suite, and reports
-# pass/fail. If anything fails, the merge to main is blocked.
+# True end-to-end CI/CD: every stage must pass for the next to run, and the
+# final stage promotes a green build to the `production` branch — which the
+# hosted environment (Streamlit Cloud) watches and auto-deploys.
+#
+# Stage chain:
+#   lint  →  typecheck  →  security  →  unit-tests  →  integration-tests  →  build  →  promote-to-production
+#
+# If any stage fails, the next ones don't run AND production isn't updated.
 
 on:
   push:
@@ -12,39 +16,76 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
-    name: Lint and test
+  # ---------------------------------------------------------------------
+  # Stage 1 — Lint
+  # ---------------------------------------------------------------------
+  lint:
+    name: 1. Lint
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11', cache: 'pip' }
+      - name: Install ruff
+        run: pip install --quiet ruff
+      - name: Run ruff
+        run: ruff check . --output-format=github
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
+  # ---------------------------------------------------------------------
+  # Stage 2 — Type check
+  # ---------------------------------------------------------------------
+  typecheck:
+    name: 2. Type check
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11', cache: 'pip' }
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov ruff
+          pip install --quiet -r requirements.txt
+          pip install --quiet mypy
+      - name: Run mypy
+        run: mypy app.py auth.py db.py models.py parsing.py repository.py
 
-      - name: Lint with ruff
+  # ---------------------------------------------------------------------
+  # Stage 3 — Security scan
+  # ---------------------------------------------------------------------
+  security:
+    name: 3. Security scan
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11', cache: 'pip' }
+      - name: Install bandit
+        run: pip install --quiet bandit
+      - name: Run bandit
+        # Scan source; ignore tests and migrations
+        run: bandit -c pyproject.toml -r . -x ./tests,./alembic,./.venv
+
+  # ---------------------------------------------------------------------
+  # Stage 4 — Unit tests (no database)
+  # ---------------------------------------------------------------------
+  unit-tests:
+    name: 4. Unit tests
+    runs-on: ubuntu-latest
+    needs: [typecheck, security]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11', cache: 'pip' }
+      - name: Install dependencies
         run: |
-          ruff check . --output-format=github || true
-        # `|| true` keeps the build green during initial setup; remove once codebase is lint-clean
-
+          pip install --quiet -r requirements.txt
+          pip install --quiet pytest pytest-cov
       - name: Syntax check
-        run: |
-          python -m py_compile app.py
-
-      - name: Run pytest with coverage
-        run: |
-          pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=xml
-
+        run: python -m py_compile app.py auth.py db.py models.py parsing.py repository.py
+      - name: Run unit tests
+        # Exclude integration tests in this fast job
+        run: pytest tests/ -v -m "not integration" --cov=. --cov-report=term-missing --cov-report=xml
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
@@ -52,3 +93,87 @@ jobs:
           name: coverage-report
           path: coverage.xml
           retention-days: 7
+
+  # ---------------------------------------------------------------------
+  # Stage 5 — Integration tests (against a real Postgres service container)
+  # ---------------------------------------------------------------------
+  integration-tests:
+    name: 5. Integration tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: interview_kit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11', cache: 'pip' }
+      - name: Install dependencies
+        run: |
+          pip install --quiet -r requirements.txt
+          pip install --quiet pytest
+      - name: Run integration tests
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/interview_kit_test
+        run: pytest tests/ -v -m integration
+
+  # ---------------------------------------------------------------------
+  # Stage 6 — Build verification (Docker image must build cleanly)
+  # ---------------------------------------------------------------------
+  build:
+    name: 6. Build Docker image
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: interview-kit:ci-${{ github.sha }}
+
+  # ---------------------------------------------------------------------
+  # Stage 7 — Promote to production
+  # ---------------------------------------------------------------------
+  # ONLY runs on direct push to main (not PRs), and ONLY if every prior
+  # stage succeeded. Force-pushes the verified main commit onto the
+  # `production` branch, which Streamlit Cloud watches and auto-deploys.
+  # This is the gate: bad code never reaches production.
+  promote-to-production:
+    name: 7. Promote to production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fast-forward production to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Push verified main → production. Force-with-lease is safer than
+          # plain --force; it refuses if production was modified out-of-band.
+          git push origin HEAD:production --force-with-lease
+      - name: Summary
+        run: |
+          echo "::notice title=Promoted::Commit ${GITHUB_SHA:0:7} passed all CI stages and was promoted to the production branch. Streamlit Cloud will redeploy automatically."
