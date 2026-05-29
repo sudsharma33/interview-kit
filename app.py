@@ -1,14 +1,13 @@
 import json
 import os
-from io import BytesIO
 
 import pandas as pd
 import streamlit as st
-from docx import Document
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from pypdf import PdfReader
+
+from parsing import extract_text  # pure-logic helpers, unit-tested in isolation
 
 load_dotenv()
 
@@ -104,22 +103,7 @@ model_name = st.sidebar.selectbox(
     help="Lite is the safest free-tier choice.",
 )
 
-# ---------- Helpers ----------
-def extract_text(uploaded_file) -> str:
-    if uploaded_file is None:
-        return ""
-    name = uploaded_file.name.lower()
-    data = uploaded_file.read()
-    if name.endswith(".pdf"):
-        reader = PdfReader(BytesIO(data))
-        return "\n".join((p.extract_text() or "") for p in reader.pages)
-    if name.endswith(".docx"):
-        doc = Document(BytesIO(data))
-        return "\n".join(p.text for p in doc.paragraphs)
-    if name.endswith(".txt"):
-        return data.decode("utf-8", errors="ignore")
-    return ""
-
+# `extract_text` lives in parsing.py for unit-testability and reuse.
 
 PROMPT = """You are an expert technical recruiter and interviewer.
 
