@@ -127,11 +127,11 @@ def _render_microsoft_button() -> None:
 
 
 def _render_password_signin_form() -> None:
-    with st.form("signin_form", clear_on_submit=False):
-        email = st.text_input("Email", key="signin_email", placeholder="you@company.com")
-        password = st.text_input("Password", type="password", key="signin_pw")
-        submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
-    if submitted:
+    # Plain widgets (no st.form) so Streamlit doesn't render its
+    # "Press Enter to submit form" tooltip on the password field.
+    email = st.text_input("Email", key="signin_email", placeholder="you@company.com")
+    password = st.text_input("Password", type="password", key="signin_pw")
+    if st.button("Sign in", type="primary", use_container_width=True, key="signin_btn"):
         try:
             user = repo.authenticate_user(email, password)
         except repo.InvalidCredentials as e:
@@ -144,13 +144,11 @@ def _render_password_signin_form() -> None:
 
 
 def _render_password_signup_form() -> None:
-    with st.form("signup_form", clear_on_submit=False):
-        email = st.text_input("Email", key="signup_email", placeholder="you@company.com")
-        name = st.text_input("Display name (optional)", key="signup_name", placeholder="Sudarshan")
-        password = st.text_input("Password", type="password", key="signup_pw", help="At least 8 characters")
-        confirm = st.text_input("Confirm password", type="password", key="signup_pw2")
-        submitted = st.form_submit_button("Create account", type="primary", use_container_width=True)
-    if submitted:
+    email = st.text_input("Email", key="signup_email", placeholder="you@company.com")
+    name = st.text_input("Display name (optional)", key="signup_name", placeholder="Sudarshan")
+    password = st.text_input("Password", type="password", key="signup_pw", help="At least 8 characters")
+    confirm = st.text_input("Confirm password", type="password", key="signup_pw2")
+    if st.button("Create account", type="primary", use_container_width=True, key="signup_btn"):
         if password != confirm:
             st.error("Passwords don't match.")
             return
