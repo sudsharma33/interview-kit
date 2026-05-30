@@ -58,11 +58,16 @@ def render_logout_button() -> None:
         st.rerun()
 
 
+# A no-op change handler. Attaching this to st.text_input causes Streamlit
+# to treat every keystroke as committed, which suppresses the
+# "Press Enter to apply" hint that otherwise appears on non-form inputs.
+def _noop():
+    pass
+
+
 def _render_signin_form() -> None:
-    # Plain widgets (no st.form) so Streamlit doesn't render its
-    # "Press Enter to submit form" tooltip on the password field.
-    email = st.text_input("Email", key="signin_email", placeholder="you@company.com")
-    password = st.text_input("Password", type="password", key="signin_pw")
+    email = st.text_input("Email", key="signin_email", on_change=_noop)
+    password = st.text_input("Password", type="password", key="signin_pw", on_change=_noop)
     if st.button("Sign in", type="primary", use_container_width=True, key="signin_btn"):
         try:
             user = repo.authenticate_user(email, password)
@@ -76,10 +81,10 @@ def _render_signin_form() -> None:
 
 
 def _render_signup_form() -> None:
-    email = st.text_input("Email", key="signup_email", placeholder="you@company.com")
-    name = st.text_input("Display name (optional)", key="signup_name", placeholder="Sudarshan")
-    password = st.text_input("Password", type="password", key="signup_pw", help="At least 8 characters")
-    confirm = st.text_input("Confirm password", type="password", key="signup_pw2")
+    email = st.text_input("Email", key="signup_email", on_change=_noop)
+    name = st.text_input("Display name (optional)", key="signup_name", on_change=_noop)
+    password = st.text_input("Password", type="password", key="signup_pw", on_change=_noop)
+    confirm = st.text_input("Confirm password", type="password", key="signup_pw2", on_change=_noop)
     if st.button("Create account", type="primary", use_container_width=True, key="signup_btn"):
         if password != confirm:
             st.error("Passwords don't match.")
