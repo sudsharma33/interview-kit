@@ -26,6 +26,13 @@ st.markdown(
       div[data-testid="stMetric"] { background: rgba(127,127,127,0.06); padding: 12px 16px; border-radius: 8px; }
       .muted { color: #888; font-size: 0.9rem; }
       .section-divider { border-top: 1px solid rgba(127,127,127,0.2); margin: 1.5rem 0; }
+      /* Hide Streamlit's "Press Enter to apply" / "Press Enter to submit form"
+         hint tooltips — Streamlit renders these inside an InputInstructions
+         element. Several markup variants exist across versions, so we cover
+         all known selectors. */
+      div[data-testid="InputInstructions"],
+      div[data-testid="stWidgetInstructions"],
+      [data-testid="InputInstructions"] { display: none !important; }
       .qcard {
         display: flex; gap: 14px;
         padding: 14px 16px; margin: 8px 0;
