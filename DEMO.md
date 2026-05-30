@@ -1,112 +1,129 @@
 # Demo Script
 
-A ~2-minute walkthrough for the hackathon presentation. Practice this once aloud before you present.
+Bullet-style prep document for the hackathon presentation. Read once tonight, once tomorrow, once 30 min before the demo. Then close it.
+
+For the speakable paragraph-form version see `Demo_Speech.md`.
 
 ---
 
-## Before you start (setup checklist)
+## Before you start
 
-- [ ] Streamlit app running (`streamlit run app.py`)
-- [ ] Browser window already open at http://localhost:8501
-- [ ] API key already pasted in the sidebar — **do not type it live**
+- [ ] Laptop charged, charger packed
+- [ ] Streamlit app running locally (`streamlit run app.py`) — pre-warm the deployed URL too
+- [ ] Browser window already at `https://interview-kit-pr.streamlit.app`
+- [ ] **Already signed in** with your demo account — don't sign in live
 - [ ] `samples/sample_jd.txt` and `samples/sample_resume.txt` open in Finder, ready to drag
-- [ ] Generate one kit beforehand and **leave it loaded** as a backup, in case the live demo fails
-- [ ] Close every other tab, notification, and Slack — no leaks
+- [ ] **TablePlus** open and connected to the Render Postgres, ready to show `users` / `kits` / `scorecards` / `audit_log`
+- [ ] `Test_Plan.xlsx` open in a second window in case Mahesh asks for it
+- [ ] `Architecture.pptx` open in Keynote — slide 1 ready
+- [ ] Phone in pocket as backup demo device
+- [ ] Generate one kit **before walking into the room** as a backup — leave the browser tab open
+- [ ] Notifications off, Slack closed, Grammarly off
 
 ---
 
 ## The 2-minute walkthrough
 
-### Opening hook (15s)
-> "Talent Acquisition teams spend 20 to 40 minutes per role preparing a tailored interview kit — they read the JD, read the candidate's resume, draft role-specific questions, identify skill gaps, and build a scorecard. I built a tool that does all of that in under a minute."
+### Opening hook (15 sec)
+> "Talent Acquisition teams spend 20-40 minutes per role preparing tailored interview kits. I built a production-grade tool that does it in under a minute, with the entire engineering pipeline behind it — real database, automated tests, gated deploys."
 
-### Show the inputs (20s)
-> "Two inputs: a job description on the left, a resume on the right. Both accept paste or upload — PDF, DOCX, or TXT."
+### Show the architecture slide (20 sec)
+*Open `Architecture.pptx` slide 1.*
+> "Here's what's live today. Streamlit Cloud serving the UI, deployed only from a `production` branch that's promoted via a 7-stage CI/CD pipeline. Postgres on Render with four tables — users, kits, scorecards, audit log. bcrypt password hashing. SQLAlchemy ORM with Alembic migrations. Dockerised. 31 automated tests."
 
-*Upload `sample_jd.txt` on the left, then `sample_resume.txt` on the right.*
+### Show the app from a signed-in state (15 sec)
+*Switch to the browser. You're already signed in.*
+> "I'm signed in as my demo user. The sidebar shows my previous kits — these came from Postgres, scoped to my user ID. Let me generate a fresh one."
 
-> "I have a sample pair ready — a Backend Engineer role and a fictional candidate with three years of Python experience. The sample is deliberately mixed: she's strong on the fundamentals but has clear gaps."
+### Generate (15 sec)
+*Upload `sample_jd.txt` and `sample_resume.txt`. Click Generate.*
+> "Two inputs. Paste or upload. Behind the scenes the app runs a quick LLM validation — guards against garbage inputs — then calls Gemini with JSON-mode and a strict schema. The output goes straight into Postgres before rendering."
 
-### Click Generate (10s)
-*Click Generate Interview Kit.*
+### Summary tab (20 sec)
+*Make sure Summary tab is active.*
+> "Role and candidate summaries. Matched skills in green pills, gap skills in amber. The recruiter walks into the interview already knowing where to probe."
 
-> "Before generation, the tool runs a quick validation — it asks the LLM whether the inputs actually look like a JD and a resume. That's a guard against the classic AI failure of producing confident output from garbage input."
+### Questions tab (25 sec)
+*Switch to Questions tab. Click into Gap Probes sub-tab.*
+> "Three categories — technical, behavioral, and gap-probing. Each gap probe is tied to a specific missing skill. Every question comes with the reasoning and the signal to listen for. That structure stops the model from generating filler."
 
-### Walk through Summary tab (25s)
-> "The Summary tab gives the interviewer instant context."
+### Scorecard tab (30 sec)
+*Switch to Scorecard tab. Click into 2-3 cells, type scores.*
+> "The scorecard is interactive — interviewer fills scores live. Watch the weighted total update. The progress bar shows criteria scored. And — this is the key bit — every keystroke is auto-saved to Postgres."
 
-*Point to the role card.*
-> "Role overview, candidate overview."
+*Switch to TablePlus, query `scorecards`.*
+> "There's the row. Real persistence, real database."
 
-*Point to the skill pills.*
-> "Matched skills in green — Python, Django, PostgreSQL, REST, CI/CD. Gap skills in amber — Go, Kafka, AWS at the depth they need, observability. So the interviewer walks in already knowing where to probe."
+### CSV / JSON export + history (15 sec)
+> "Two exports. CSV for the hiring panel — opens in Excel. JSON for system integration, with my scores embedded. And if I close the tab and sign back in tomorrow, the sidebar shows this kit, click it, the scores I just entered are still there — restored from Postgres."
 
-### Walk through Questions tab (20s)
-*Switch to Questions tab.*
-
-> "Three categories. Technical, behavioral, and — most useful — gap-probing questions, tied to the specific skills she's missing."
-
-*Click into Gap Probes sub-tab. Read one question aloud.*
-> "Notice each question comes with the reasoning and the signal to listen for. The interviewer isn't just told what to ask — they're told why, and what a good answer sounds like."
-
-### Walk through Scorecard tab (25s)
-*Switch to Scorecard tab.*
-
-> "The scorecard is interactive — the interviewer fills scores 1 to 5 during the interview."
-
-*Click into 2 or 3 score cells, type numbers, hit Tab.*
-
-> "Weighted total updates live. Progress bar shows how many criteria are still pending. And everything exports — scorecard as CSV for the hiring panel, full kit as JSON for ATS integration."
-
-### Close (10s)
-> "End to end: text in, structured interview kit out, with the interviewer staying in the loop on every judgment call. Hours of TA capacity back per week."
+### Close (10 sec)
+> "End to end: real auth, real database, real CI/CD pipeline gating production deploys. Happy to take questions about any layer."
 
 ---
 
 ## Q&A — likely questions and pre-built answers
 
-**"Why Streamlit over React?"**
-> "Single-file Python, no separate frontend or backend, no build step. Best ROI for an 8-hour budget. React would have burned two hours on scaffolding before any business logic."
+### "Walk me through the CI/CD pipeline"
+> 7 stages: ruff lint, mypy type check, bandit security scan, pytest unit tests, pytest integration tests against a Postgres service container, Docker build verification, and finally a promote step that fast-forwards `main` → `production`. Streamlit Cloud watches `production`. Bad code never reaches users.
 
-**"Why Gemini?"**
-> "Genuine free tier, no credit card. The provider is swappable in roughly ten lines — the architecture isn't locked in."
+### "How do you handle multi-user data isolation?"
+> Every kit and scorecard row carries the `created_by` / `filled_by` foreign key to the user UUID. The repository layer scopes every read by `user_id`. There's an integration test — `test_list_kits_is_user_scoped` — that creates two users, generates kits for each, and asserts that neither user sees the other's kits.
 
-**"How do you stop the model from hallucinating?"**
-> "Three guardrails. First, a pre-flight validator that classifies the inputs. Second, JSON-mode with a strict schema — the model can't return free-form text, so I get a contract. Third, the interviewer is always the final judge — the app suggests, the human decides."
+### "How is the password stored?"
+> Bcrypt hash with cost factor 12. The plain text never touches the database. There's a test — `test_password_hash_is_not_plain_text` — that asserts the hash starts with `$2b$` and that two hashes of the same password are different (because of the per-password salt).
 
-**"What testing did you do?"**
-> "Manual exploratory testing — adversarial inputs, deliberately broken cases. I caught and fixed real bugs that way, like stale validation warnings and a scorecard reset issue. In a production version I'd add pytest unit tests, a contract test on the JSON schema, and an eval set of expected gap skills to guard against prompt regressions."
+### "How does the auto-save work?"
+> Every Streamlit rerun computes a hash of the scorecard state. If the hash differs from the last saved one, the repository fires an upsert into the `scorecards` table. Hash unchanged = no DB write. So typing one digit is one write, not one per keystroke.
 
-**"What development methodology?"**
-> "Iterative incremental — build a minimal end-to-end scaffold first, then small feature cycles: build, test, commit, repeat. Closer to Agile than waterfall, but with no team and an 8-hour budget the right honest label is iterative-incremental."
+### "What's in your test suite?"
+> 31 tests across 3 files. 22 unit tests for pure logic — parsing, schema contracts, scoring math, password hashing. 9 integration tests that spin up a real Postgres in CI and exercise the full repository layer. All run on every push via GitHub Actions.
 
-**"What would you do with more time?"**
-> Pick *two or three* — don't list everything:
-> - Role templates (SDE, Data, PM) for role-specific question patterns
-> - Multi-candidate comparison view for a single role
-> - ATS integration to push the JSON kit into Greenhouse or Lever
+### "Why not automate the UI tests?"
+> Backend logic is automated with pytest. UI flows are manual today and listed in the Test Plan as "Partial" coverage. Adding Playwright is the documented next-step layer of the testing pyramid — would automate the manual cases without re-discovering what they test.
 
-**"What's the cost?"**
-> "Free tier — zero. Two LLM calls per kit. At production scale on paid tier, roughly a tenth of a cent per kit on flash-lite."
+### "Why Streamlit and not React + FastAPI?"
+> For a single-process app with one developer in a time-constrained build, Streamlit collapses the client/server split into one file. The Dockerfile and the production architecture doc show the path to a React + FastAPI split when scale demands it.
 
-**"What if the LLM is down?"**
-> "Validation degrades gracefully — if the validator call fails, it assumes inputs are valid and proceeds. If the main generation fails, the error is surfaced clearly to the user with the underlying message. No silent failures."
+### "What does production-grade mean to you?"
+> Five things: real data persistence, real authentication, automated tests gating deploys, schema migrations versioned in code, audit trail of every state change. All five are present in this build.
+
+### "Show me the database schema"
+*Open TablePlus, click on the `users` table → Schema view.*
+> Four tables. Users with bcrypt password hash. Kits with the full LLM JSON output stored as JSONB. Scorecards with one row per `(kit, interviewer)` pair, upserted on every save. Audit log append-only, indexed by user and action.
+
+### "What would you build next?"
+> Three things in order: Microsoft Entra ID SSO alongside email/password (Azure registration is done, just an unresolved Streamlit OIDC interaction blocking the wire-up), multi-candidate comparison view, ATS integration via webhooks. Each one is additive — no rewrites needed.
 
 ---
 
 ## If something breaks live
 
-- **Generation 429 / quota error** → switch model in sidebar to `gemini-flash-latest`. If still failing, fall back to the pre-loaded kit you generated beforehand.
-- **Browser stuck** → refresh. Session state will keep the loaded kit.
-- **Streamlit crashed** → in terminal, hit ↑ then Enter to restart. Takes 3 seconds.
-- **Nothing works** → talk through the README's "Design decisions" section instead. Substance over spectacle.
+| Failure | Recovery |
+|---|---|
+| Gemini 429 | Switch model in sidebar to `gemini-flash-latest`. Fall back to pre-generated kit if still broken. |
+| Browser hangs | Refresh. Session_state preserved, kit data in DB. |
+| Streamlit Cloud cold-start delay | Pre-warm by visiting the URL 5 min before demo. |
+| Tablet/phone backup needed | Open `interview-kit-pr.streamlit.app` on your phone. Same login works. |
+| Demo machine fails entirely | Run `streamlit run app.py` from your local laptop. Same DB, same data. |
 
 ---
 
 ## What NOT to do
 
-- Don't type the API key live — paste it before you start
-- Don't list every "next-step enhancement" — pick 2 or 3
-- Don't apologize for limitations — frame them as deliberate scope choices
-- Don't mention the leaked keys, ever
-- Don't use the word "just" ("I just built…") — it undersells the work
+- Don't sign in live — already be signed in
+- Don't type the API key live — it's in Streamlit Cloud Secrets
+- Don't admit uncertainty about your own code — "Let me show you" beats "I think"
+- Don't apologise for limitations — frame them as deliberate scope choices
+- Don't mention the leaked API keys or the abandoned SSO debug session
+
+---
+
+## Tone
+
+- **Slow down 30%.** Nervous = fast. Pause one second after each sentence.
+- **Eye contact on one person per sentence.** Move between panel members deliberately.
+- **Point at the screen** when you say "here" — anchors attention.
+- **If you blank** — say "let me show you this" and click the next tab. The visual restarts your brain. Nobody notices the pause.
+
+You've shipped real production-grade work. Show it.
