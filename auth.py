@@ -58,17 +58,15 @@ def render_logout_button() -> None:
         st.rerun()
 
 
-# A no-op change handler. Attaching this to st.text_input causes Streamlit
-# to treat every keystroke as committed, which suppresses the
-# "Press Enter to apply" hint that otherwise appears on non-form inputs.
-def _noop():
-    pass
-
-
 def _render_signin_form() -> None:
-    email = st.text_input("Email", key="signin_email", on_change=_noop)
-    password = st.text_input("Password", type="password", key="signin_pw", on_change=_noop)
-    if st.button("Sign in", type="primary", use_container_width=True, key="signin_btn"):
+    # Wrapped in st.form so pressing Enter in any field submits the form —
+    # st.form_submit_button is the only button type Streamlit triggers on
+    # Enter. Plain st.button only fires on a click.
+    with st.form("signin_form"):
+        email = st.text_input("Email", key="signin_email")
+        password = st.text_input("Password", type="password", key="signin_pw")
+        submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
+    if submitted:
         try:
             user = repo.authenticate_user(email, password)
         except repo.InvalidCredentials as e:
@@ -81,11 +79,14 @@ def _render_signin_form() -> None:
 
 
 def _render_signup_form() -> None:
-    email = st.text_input("Email", key="signup_email", on_change=_noop)
-    name = st.text_input("Display name (optional)", key="signup_name", on_change=_noop)
-    password = st.text_input("Password", type="password", key="signup_pw", on_change=_noop)
-    confirm = st.text_input("Confirm password", type="password", key="signup_pw2", on_change=_noop)
-    if st.button("Create account", type="primary", use_container_width=True, key="signup_btn"):
+    # Same st.form pattern as sign-in so Enter submits the registration.
+    with st.form("signup_form"):
+        email = st.text_input("Email", key="signup_email")
+        name = st.text_input("Display name (optional)", key="signup_name")
+        password = st.text_input("Password", type="password", key="signup_pw")
+        confirm = st.text_input("Confirm password", type="password", key="signup_pw2")
+        submitted = st.form_submit_button("Create account", type="primary", use_container_width=True)
+    if submitted:
         if password != confirm:
             st.error("Passwords don't match.")
             return
