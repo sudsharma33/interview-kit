@@ -165,6 +165,25 @@ def load_kit(kit_id: str) -> dict | None:
         return _kit_to_dict(k, include_text=True) if k else None
 
 
+def delete_kit(kit_id: str, user_id: str) -> bool:
+    """
+    Delete a kit owned by the given user, cascading to its scorecards.
+
+    Scoped by user_id so a user can only ever delete their own kits — passing
+    someone else's kit_id is a no-op, not an error. Returns True if a kit was
+    deleted, False if no matching owned kit was found. Writes a kit.deleted
+    audit row in the same transaction, preserving the audit trail even though
+    the kit row itself is gone.
+    """
+    with get_session() as s:
+        k = s.get(Kit, kit_id)
+        if k is None or k.created_by != user_id:
+            return False
+        s.delete(k)  # cascade="all, delete-orphan" removes child scorecards
+        s.add(AuditLog(user_id=user_id, action="kit.deleted", resource_id=kit_id))
+    return True
+
+
 def _kit_to_dict(k: Kit, *, include_text: bool = False) -> dict:
     out = {
         "id": k.id,

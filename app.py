@@ -147,7 +147,9 @@ def _render_history_sidebar():
         # Prefer the composed label (saved on newer kits); fall back gracefully.
         label = (k.get("role_title") or k.get("candidate_name") or "Untitled kit")[:60]
         when = k["created_at"].strftime("%b %d, %H:%M")
-        if st.sidebar.button(f"{label}\n{when}", key=f"hist_{k['id']}", use_container_width=True):
+        # Load button (wide) + delete button (narrow) on one row.
+        load_col, del_col = st.sidebar.columns([5, 1])
+        if load_col.button(f"{label}\n{when}", key=f"hist_{k['id']}", use_container_width=True):
             loaded = repo.load_kit(k["id"])
             if loaded:
                 st.session_state.kit = loaded["kit_json"]
@@ -162,6 +164,13 @@ def _render_history_sidebar():
                 # invalidate any stale auto-save snapshot from a previous kit
                 st.session_state.pop("scorecard_last_saved_hash", None)
                 st.rerun()
+        if del_col.button("✕", key=f"del_{k['id']}", use_container_width=True, help="Delete this kit"):
+            repo.delete_kit(k["id"], st.session_state.user_id)
+            # If the kit being deleted is the one currently open, clear it from view.
+            if st.session_state.get("kit_id") == k["id"]:
+                for key in ("kit", "kit_id", "loaded_scorecard_rows", "scorecard_last_saved_hash"):
+                    st.session_state.pop(key, None)
+            st.rerun()
 
 
 # `extract_text` lives in parsing.py for unit-testability and reuse.

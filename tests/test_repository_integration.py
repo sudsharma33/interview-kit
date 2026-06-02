@@ -139,6 +139,28 @@ def test_list_kits_is_user_scoped(repo):
     assert all(k["role_title"] == "B-kit" for k in b_kits)
 
 
+def test_delete_kit_removes_owned_kit(repo, fresh_email):
+    """A user can delete their own kit; it disappears from their list."""
+    user = repo.register_user(fresh_email, "DeletePass123", None)
+    kit_id = repo.save_kit(user_id=user["id"], jd_text="x", resume_text="y", kit_json={}, role_title="To-delete")
+    assert repo.load_kit(kit_id) is not None
+
+    deleted = repo.delete_kit(kit_id, user["id"])
+    assert deleted is True
+    assert repo.load_kit(kit_id) is None
+    assert all(k["id"] != kit_id for k in repo.list_kits_for_user(user["id"]))
+
+
+def test_delete_kit_cannot_delete_another_users_kit(repo):
+    """Deleting someone else's kit is a no-op — owner scoping holds."""
+    owner = repo.register_user(f"own-{uuid.uuid4().hex[:6]}@ex.com", "OwnerPass123", None)
+    attacker = repo.register_user(f"atk-{uuid.uuid4().hex[:6]}@ex.com", "AttackPass12", None)
+    kit_id = repo.save_kit(user_id=owner["id"], jd_text="x", resume_text="y", kit_json={}, role_title="Owned")
+
+    assert repo.delete_kit(kit_id, attacker["id"]) is False
+    assert repo.load_kit(kit_id) is not None  # still there
+
+
 # ---------------------------------------------------------------------------
 # Scorecard persistence + upsert
 # ---------------------------------------------------------------------------
