@@ -1,4 +1,5 @@
 import json
+import math
 import os
 
 import pandas as pd
@@ -111,6 +112,24 @@ model_name = st.sidebar.selectbox(
     index=0,
     help="Lite is the safest free-tier choice.",
 )
+
+
+def _json_safe_records(df: pd.DataFrame) -> list[dict]:
+    """
+    Convert a DataFrame to records with NaN/Infinity coerced to None.
+
+    st.data_editor returns a pandas DataFrame whose empty cells are float NaN.
+    NaN and Infinity are NOT valid JSON, so both Postgres JSONB and json.dumps
+    reject them — which broke scorecard auto-save and would corrupt the JSON
+    export. We sanitise at the serialisation boundary so the same clean records
+    feed both the DB write and the download.
+    """
+    records = df.to_dict(orient="records")
+    for row in records:
+        for key, val in row.items():
+            if isinstance(val, float) and not math.isfinite(val):
+                row[key] = None
+    return records
 
 
 def _compose_role_label(kit: dict) -> str:
@@ -572,7 +591,7 @@ if "kit" in st.session_state:
             # only issue a DB write if it changed since the last save. That
             # keeps the keystroke-level rerun cycle cheap.
             if "kit_id" in st.session_state and "user_id" in st.session_state:
-                scorecard_rows = edited.to_dict(orient="records")
+                scorecard_rows = _json_safe_records(edited)
                 # tuple of (criterion, score, notes) is a stable, JSON-safe signature
                 sig = tuple(
                     (r.get("criterion"), r.get("Score"), r.get("Notes", ""))
@@ -598,7 +617,7 @@ if "kit" in st.session_state:
             # back into the kit and includes computed totals.
             export_kit = {
                 **kit,
-                "scorecard": edited.to_dict(orient="records"),
+                "scorecard": _json_safe_records(edited),
                 "scoring_summary": {
                     "weighted_score": float(weighted),
                     "max_possible": float(max_score) if max_score else 0.0,
