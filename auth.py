@@ -22,15 +22,32 @@ from __future__ import annotations
 import streamlit as st
 
 import repository as repo
+import session_token
+
+# Query-param key that carries the signed session token. Living in the URL is
+# what lets a sign-in survive a browser refresh (see session_token.py).
+_TOKEN_QP = "s"
 
 
-def _set_logged_in(user: dict) -> None:
+def _apply_user(user: dict) -> None:
+    """Populate session_state from a user dict (no token side effects)."""
     st.session_state.user_id = user["id"]
     st.session_state.user_email = user["email"]
     st.session_state.user_name = user.get("display_name")
     # Wipe any leftover kit state from a previous session
     st.session_state.pop("scorecard_last_saved_hash", None)
     st.session_state.pop("loaded_scorecard_rows", None)
+
+
+def _set_logged_in(user: dict) -> None:
+    _apply_user(user)
+    # Park a signed token in the URL so the session survives a hard refresh.
+    try:
+        st.query_params[_TOKEN_QP] = session_token.make_token(user["id"])
+    except Exception:
+        # Never let token minting break the login flow — worst case the user
+        # simply doesn't get refresh-survival this session.
+        pass
 
 
 def _logout() -> None:
@@ -40,6 +57,41 @@ def _logout() -> None:
         "scorecard_last_saved_hash", "loaded_scorecard_rows",
     ]:
         st.session_state.pop(key, None)
+    # Drop the token from the URL so a refresh after sign-out stays signed out.
+    if _TOKEN_QP in st.query_params:
+        del st.query_params[_TOKEN_QP]
+
+
+def restore_session_from_token() -> None:
+    """
+    Re-hydrate session_state from a signed URL token after a refresh.
+
+    Called once at the top of the app, BEFORE require_login(). If the user is
+    already in session_state this is a no-op. Otherwise it verifies the token
+    in the URL and, if valid, looks the user up in the database and restores
+    them — so a hard refresh no longer kicks them back to the login screen.
+    """
+    if is_logged_in():
+        return
+    token = st.query_params.get(_TOKEN_QP)
+    if not token:
+        return
+    user_id = session_token.read_token(token)
+    if not user_id:
+        # Tampered, malformed, or expired — clear the stale token.
+        del st.query_params[_TOKEN_QP]
+        return
+    try:
+        user = repo.get_user_by_id(user_id)
+    except Exception:
+        # DB hiccup — leave the token in place and try again next run rather
+        # than logging the user out on a transient error.
+        return
+    if user:
+        _apply_user(user)
+    else:
+        # User no longer exists — clear the orphaned token.
+        del st.query_params[_TOKEN_QP]
 
 
 def is_logged_in() -> bool:

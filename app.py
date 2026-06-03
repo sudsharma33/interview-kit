@@ -359,6 +359,12 @@ def input_column(label: str, state_key: str, file_key: str, name_key: str, clear
     )
 
 
+# Survive a browser refresh: if a valid signed token is present in the URL,
+# re-hydrate the session from it BEFORE the login gate runs. Streamlit's
+# session_state is wiped on a hard refresh, so without this the user would be
+# bounced back to the sign-in card every time they reload.
+auth.restore_session_from_token()
+
 # Gate the entire app behind sign-in. Until the user is authenticated,
 # render_login_gate() shows the centred sign-in / sign-up card (which has
 # its OWN title) and st.stop() halts everything below.
