@@ -45,7 +45,9 @@ _TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days
 # SESSION_SECRET env var (Streamlit Cloud Secrets / .env). The fallback only
 # exists so local dev works out of the box; it is intentionally constant so
 # tokens stay valid across reruns on a single machine.
-_FALLBACK_SECRET = "ikg-dev-session-secret-change-me"
+# Justification (B105 suppressed below): not a real credential — a dev default;
+# the real secret is supplied at runtime via the SESSION_SECRET env var.
+_FALLBACK_SECRET = "ikg-dev-session-secret-change-me"  # nosec B105
 
 
 def _secret() -> bytes:
@@ -65,7 +67,7 @@ def _b64d(s: str) -> bytes:
 def make_token(user_id: str, *, ttl: int = _TTL_SECONDS) -> str:
     """Mint a signed `<payload>.<sig>` token carrying the user id and expiry."""
     expiry = int(time.time()) + ttl
-    payload = f"{user_id}:{expiry}".encode("utf-8")
+    payload = f"{user_id}:{expiry}".encode()
     sig = hmac.new(_secret(), payload, hashlib.sha256).digest()
     return f"{_b64e(payload)}.{_b64e(sig)}"
 

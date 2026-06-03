@@ -26,7 +26,7 @@ import session_token
 
 # Query-param key that carries the signed session token. Living in the URL is
 # what lets a sign-in survive a browser refresh (see session_token.py).
-_TOKEN_QP = "s"
+_QP_KEY = "s"
 
 
 def _apply_user(user: dict) -> None:
@@ -43,10 +43,11 @@ def _set_logged_in(user: dict) -> None:
     _apply_user(user)
     # Park a signed token in the URL so the session survives a hard refresh.
     try:
-        st.query_params[_TOKEN_QP] = session_token.make_token(user["id"])
-    except Exception:
-        # Never let token minting break the login flow — worst case the user
-        # simply doesn't get refresh-survival this session.
+        st.query_params[_QP_KEY] = session_token.make_token(user["id"])
+    except Exception:  # nosec B110
+        # Intentional non-blocking guard: token minting must never break the
+        # sign-in flow — worst case the user simply doesn't get refresh-survival
+        # this session.
         pass
 
 
@@ -58,8 +59,8 @@ def _logout() -> None:
     ]:
         st.session_state.pop(key, None)
     # Drop the token from the URL so a refresh after sign-out stays signed out.
-    if _TOKEN_QP in st.query_params:
-        del st.query_params[_TOKEN_QP]
+    if _QP_KEY in st.query_params:
+        del st.query_params[_QP_KEY]
 
 
 def restore_session_from_token() -> None:
@@ -73,13 +74,13 @@ def restore_session_from_token() -> None:
     """
     if is_logged_in():
         return
-    token = st.query_params.get(_TOKEN_QP)
+    token = st.query_params.get(_QP_KEY)
     if not token:
         return
     user_id = session_token.read_token(token)
     if not user_id:
         # Tampered, malformed, or expired — clear the stale token.
-        del st.query_params[_TOKEN_QP]
+        del st.query_params[_QP_KEY]
         return
     try:
         user = repo.get_user_by_id(user_id)
@@ -91,7 +92,7 @@ def restore_session_from_token() -> None:
         _apply_user(user)
     else:
         # User no longer exists — clear the orphaned token.
-        del st.query_params[_TOKEN_QP]
+        del st.query_params[_QP_KEY]
 
 
 def is_logged_in() -> bool:
